@@ -1,185 +1,200 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Plot Fetch Results",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "plot_fetch_results",
-            // "args": ["--csv", "logs/td3_FetchReach_dense_seed0.csv"]
-            "args": ["--csv", "logs/td3_FetchPickAndPlace_dense_seed0.csv"]
-        },
-        
-  {
-    "name": "DDPG Baseline",
-    "type": "debugpy",
-    "request": "launch",
-    "program": "baseline_ddpg.py",
-    "args": [
-      "--task", "FetchReach",
-      "--reward-type", "dense",
-      "--episodes", "300",
-      "--seed", "0",
-      "--device", "cpu",
-      "--start-steps", "1000",
-      "--batch-size", "256",
-      "--actor-lr", "0.0001",
-      "--critic-lr", "0.0003",
-      "--tau", "0.005",
-      "--gamma", "0.98",
-      "--action-noise", "0.2",
-      "--replay-size", "200000",
-      "--eval-every", "10",
-      "--eval-episodes", "20",
-      "--log-dir", "logs",
-      "--plots-dir", "plots",
-      "--plot-smooth", "10"
-    ]
-  },
-  {
-    "name": "TD3 Baseline",
-    "type": "debugpy",
-    "request": "launch",
-    "program": "baseline_td3.py",
-    "args": [
-      "--task", "FetchReach",
-      "--reward-type", "dense",
-      "--episodes", "300",
-      "--seed", "0",
-      "--device", "cpu",
-      "--start-steps", "1000",
-      "--batch-size", "256",
-      "--actor-lr", "0.0001",
-      "--critic-lr", "0.0003",
-      "--tau", "0.005",
-      "--gamma", "0.98",
-      "--action-noise", "0.1",
-      "--td3-policy-noise", "0.2",
-      "--td3-noise-clip", "0.5",
-      "--td3-policy-delay", "2",
-      "--replay-size", "200000",
-      "--eval-every", "10",
-      "--eval-episodes", "20",
-      "--log-dir", "logs",
-      "--plots-dir", "plots",
-      "--plot-smooth", "10"
-    ]
-  },
-  {
-    "name": "SAC Baseline",
-    "type": "debugpy",
-    "request": "launch",
-    "program": "baseline_sac.py",
-    "args": [
-      "--task", "FetchReach",
-      "--reward-type", "dense",
-      "--episodes", "300",
-      "--seed", "0",
-      "--device", "cpu",
-      "--start-steps", "1000",
-      "--batch-size", "256",
-      "--actor-lr", "0.0003",
-      "--critic-lr", "0.0003",
-      "--tau", "0.005",
-      "--gamma", "0.98",
-      "--alpha", "0.2",
-      "--replay-size", "200000",
-      "--eval-every", "10",
-      "--eval-episodes", "20",
-      "--log-dir", "logs",
-      "--plots-dir", "plots",
-      "--plot-smooth", "10"
-    ]
-  },
-  {
-      "name": "Optuna - TD3 Hyperparameter Tuning",
+  "version": "0.2.0",
+  "configurations": [
+
+    // =========================
+    // DDPG
+    // =========================
+    {
+      "name": "DDPG - FetchReach Dense",
       "type": "debugpy",
       "request": "launch",
-      "program": "train_baselines_optuna.py",
+      "program": "baselines/baseline_ddpg.py",
       "args": [
-        "--algorithm", "td3",
         "--task", "FetchReach",
         "--reward-type", "dense",
-
-        "--n-trials", "20",
-        "--seeds", "0", "1",
-
-        "--episodes", "300",
+        "--episodes", "500",
+        "--seed", "0",
         "--device", "cpu",
 
+        "--batch-size", "256",
+        "--actor-lr", "0.0001",
+        "--critic-lr", "0.001",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+
+        "--start-steps", "1000",
+        "--action-noise", "0.1",
+
         "--eval-every", "10",
-        "--eval-episodes", "20",
-
-        "--objective", "eval_success",
-
-        "--log-dir", "logs_optuna",
-        "--plots-dir", "plots_optuna",
-        "--results-dir", "optuna_results",
-
-        "--plot-smooth", "10"
+        "--eval-episodes", "20"
       ]
     },
     {
-      "name": "Optuna - DDPG Hyperparameter Tuning",
+      "name": "DDPG - FetchReach Sparse",
       "type": "debugpy",
       "request": "launch",
-      "program": "train_baselines_optuna.py",
+      "program": "baselines/baseline_ddpg.py",
       "args": [
-        "--algorithm", "ddpg",
         "--task", "FetchReach",
-        "--reward-type", "dense",
-
-        "--n-trials", "20",
-        "--seeds", "0", "1",
-
-        "--episodes", "300",
+        "--reward-type", "sparse",
+        "--episodes", "1000",
+        "--seed", "0",
         "--device", "cpu",
 
+        "--batch-size", "256",
+        "--actor-lr", "0.0001",
+        "--critic-lr", "0.001",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+
+        "--start-steps", "2000",
+        "--action-noise", "0.2",
+
         "--eval-every", "10",
-        "--eval-episodes", "20",
+        "--eval-episodes", "20"
+      ]
+    },
 
-        "--objective", "eval_success",
+    // =========================
+    // TD3
+    // =========================
+    {
+      "name": "TD3 - FetchReach Dense",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "baselines/baseline_td3.py",
+      "args": [
+        "--task", "FetchReach",
+        "--reward-type", "dense",
+        "--episodes", "800",
+        "--seed", "0",
+        "--device", "cpu",
 
-        "--log-dir", "logs_optuna",
-        "--plots-dir", "plots_optuna",
-        "--results-dir", "optuna_results"
+        "--batch-size", "256",
+        "--actor-lr", "0.0001",
+        "--critic-lr", "0.0003",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+
+        "--start-steps", "1000",
+        "--action-noise", "0.1",
+
+        "--td3-policy-noise", "0.2",
+        "--td3-noise-clip", "0.5",
+        "--td3-policy-delay", "2",
+
+        "--eval-every", "10",
+        "--eval-episodes", "20"
       ]
     },
     {
-      "name": "Optuna - SAC Hyperparameter Tuning",
+      "name": "TD3 - FetchReach Sparse",
       "type": "debugpy",
       "request": "launch",
-      "program": "train_baselines_optuna.py",
+      "program": "baselines/baseline_td3.py",
       "args": [
-        "--algorithm", "sac",
         "--task", "FetchReach",
-        "--reward-type", "dense",
-
-        "--n-trials", "20",
-        "--seeds", "0", "1",
-
-        "--episodes", "300",
+        "--reward-type", "sparse",
+        "--episodes", "1000",
+        "--seed", "0",
         "--device", "cpu",
 
+        "--batch-size", "256",
+        "--actor-lr", "0.0001",
+        "--critic-lr", "0.0003",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+
+        "--start-steps", "2000",
+        "--action-noise", "0.2",
+
+        "--td3-policy-noise", "0.2",
+        "--td3-noise-clip", "0.5",
+        "--td3-policy-delay", "2",
+
         "--eval-every", "10",
-        "--eval-episodes", "20",
-
-        "--objective", "eval_success",
-
-        "--log-dir", "logs_optuna",
-        "--plots-dir", "plots_optuna",
-        "--results-dir", "optuna_results"
+        "--eval-episodes", "20"
       ]
     },
-        {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
-        }
-    ]
+
+    // =========================
+    // SAC
+    // =========================
+    {
+      "name": "SAC - FetchReach Dense",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "baselines/baseline_sac.py",
+      "args": [
+        "--task", "FetchReach",
+        "--reward-type", "dense",
+        "--episodes", "800",
+        "--seed", "0",
+        "--device", "cpu",
+
+        "--batch-size", "256",
+        "--actor-lr", "0.0003",
+        "--critic-lr", "0.0003",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+        "--alpha", "0.2",
+
+        "--start-steps", "1000",
+
+        "--eval-every", "10",
+        "--eval-episodes", "20"
+      ]
+    },
+    {
+      "name": "SAC - FetchReach Sparse",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "baselines/baseline_sac.py",
+      "args": [
+        "--task", "FetchReach",
+        "--reward-type", "sparse",
+        "--episodes", "1000",
+        "--seed", "0",
+        "--device", "cpu",
+
+        "--batch-size", "256",
+        "--actor-lr", "0.0003",
+        "--critic-lr", "0.0003",
+        "--gamma", "0.98",
+        "--tau", "0.005",
+        "--alpha", "0.2",
+
+        "--start-steps", "2000",
+
+        "--eval-every", "10",
+        "--eval-episodes", "20"
+      ]
+    },
+
+    // =========================
+    // AGGREGATION
+    // =========================
+    {
+      "name": "Aggregate Baseline Results",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "baselines/aggregate_baseline_results.py",
+      "args": [
+        "--baseline-dir", "baselines"
+      ]
+    },
+
+    // =========================
+    // DEFAULT DEBUG
+    // =========================
+    {
+      "name": "Python Debugger: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal"
+    }
+
+  ]
 }

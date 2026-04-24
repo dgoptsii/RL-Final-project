@@ -40,6 +40,7 @@ def build_common_cmd(python_exec: str, script_name: str, args, seed: int, log_di
         "--log-dir", log_dir,
         "--plots-dir", plots_dir,
         "--plot-smooth", str(args.plot_smooth),
+        "--baseline-dir", args.baseline_dir,
     ]
 
     if args.eval_on_first_episode:
@@ -67,6 +68,17 @@ def add_algorithm_specific_args(cmd: List[str], algorithm: str, args) -> List[st
 
 def csv_name_for_run(algorithm: str, task: str, reward_type: str, seed: int) -> str:
     return f"{algorithm}_{task}_{reward_type}_seed{seed}.csv"
+
+
+def csv_path_for_run(baseline_dir: str, algorithm: str, task: str, reward_type: str, seed: int) -> str:
+    return os.path.join(
+        baseline_dir,
+        "logs",
+        algorithm,
+        f"{task}_{reward_type}",
+        f"seed{seed}",
+        csv_name_for_run(algorithm, task, reward_type, seed),
+    )
 
 
 def read_objective_from_csv(csv_path: str, objective: str) -> float:
@@ -153,10 +165,7 @@ def run_single_trial(args, trial: optuna.Trial) -> float:
         if result.returncode != 0:
             raise RuntimeError(f"Baseline script failed on trial {trial.number}, seed {seed}")
 
-        csv_path = os.path.join(
-            trial_log_dir,
-            csv_name_for_run(algorithm, args.task, args.reward_type, seed)
-        )
+        csv_path = csv_path_for_run(args.baseline_dir, algorithm, args.task, args.reward_type, seed)
         score = read_objective_from_csv(csv_path, args.objective)
         seed_scores.append(score)
 
@@ -220,7 +229,8 @@ def main():
     parser.add_argument("--log-dir", type=str, default="logs_optuna")
     parser.add_argument("--plots-dir", type=str, default="plots_optuna")
     parser.add_argument("--plot-smooth", type=int, default=10)
-    parser.add_argument("--results-dir", type=str, default="optuna_results")
+    parser.add_argument("--results-dir", type=str, default="baselines/optuna_results")
+    parser.add_argument("--baseline-dir", type=str, default="baselines")
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)

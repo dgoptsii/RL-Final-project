@@ -1,0 +1,11 @@
+# Ignore generated experiment outputs
+baselines/plots/
+baselines/logs/
+baseline/plots/
+baseline/logs/
+
+# General
+**/*.png
+**/*.csv
+__pycache__/
+*.pyc

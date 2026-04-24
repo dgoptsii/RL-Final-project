@@ -1,6 +1,7 @@
 
 import argparse
 import csv
+import json
 import os
 import random
 from collections import deque
@@ -14,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from plot_results import find_x_column, outdir_for_csv, plot_single_run
+from plot_baselines_results import find_x_column, outdir_for_csv, plot_single_run
 
 gym.register_envs(gymnasium_robotics)
 
@@ -255,6 +256,89 @@ class TD3Agent:
             tp.data.copy_(self.tau * p.data + (1.0 - self.tau) * tp.data)
 
 
+# ---------------------------------------------------------------------------
+# Output helpers
+# ---------------------------------------------------------------------------
+
+def create_run_dirs(base_dir: str, algorithm: str, task: str, reward_type: str, seed: int) -> dict:
+    run_group = f"{task}_{reward_type}"
+    seed_name = f"seed{seed}"
+    dirs = {
+        "logs": os.path.join(base_dir, "logs", algorithm, run_group, seed_name),
+        "plots": os.path.join(base_dir, "plots", algorithm, run_group, seed_name),
+        "models": os.path.join(base_dir, "models", algorithm, run_group, seed_name),
+        "summaries": os.path.join(base_dir, "summaries", algorithm, run_group, seed_name),
+        "results": os.path.join(base_dir, "results"),
+    }
+    for d in dirs.values():
+        os.makedirs(d, exist_ok=True)
+    return dirs
+
+
+def summarize_run(csv_path: str, algorithm: str, task: str, reward_type: str, seed: int, args,
+                  model_path: str, last_n: int = 5) -> dict:
+    df = pd.read_csv(csv_path)
+    eval_success = df["eval_success"].dropna() if "eval_success" in df.columns else pd.Series(dtype=float)
+    eval_return = df["eval_return"].dropna() if "eval_return" in df.columns else pd.Series(dtype=float)
+
+    return {
+        "algorithm": algorithm,
+        "task": task,
+        "reward_type": reward_type,
+        "seed": seed,
+        "episodes": args.episodes,
+        "eval_every": args.eval_every,
+        "eval_episodes": args.eval_episodes,
+        "final_eval_success": float(eval_success.iloc[-1]) if len(eval_success) else float("nan"),
+        "best_eval_success": float(eval_success.max()) if len(eval_success) else float("nan"),
+        "last5_eval_success_mean": float(eval_success.tail(last_n).mean()) if len(eval_success) else float("nan"),
+        "last5_eval_success_std": float(eval_success.tail(last_n).std(ddof=0)) if len(eval_success) else float("nan"),
+        "final_eval_return": float(eval_return.iloc[-1]) if len(eval_return) else float("nan"),
+        "best_eval_return": float(eval_return.max()) if len(eval_return) else float("nan"),
+        "last5_eval_return_mean": float(eval_return.tail(last_n).mean()) if len(eval_return) else float("nan"),
+        "csv_path": csv_path,
+        "model_path": model_path,
+    }
+
+
+def write_summary_files(summary: dict, run_summary_dir: str, global_results_dir: str) -> None:
+    run_csv = os.path.join(run_summary_dir, "summary.csv")
+    run_json = os.path.join(run_summary_dir, "summary.json")
+    pd.DataFrame([summary]).to_csv(run_csv, index=False)
+    with open(run_json, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2)
+
+    global_csv = os.path.join(global_results_dir, "baseline_results.csv")
+    new_row = pd.DataFrame([summary])
+    if os.path.exists(global_csv):
+        old = pd.read_csv(global_csv)
+        key = ((old["algorithm"] == summary["algorithm"]) &
+               (old["task"] == summary["task"]) &
+               (old["reward_type"] == summary["reward_type"]) &
+               (old["seed"] == summary["seed"]))
+        old = old.loc[~key]
+        out = pd.concat([old, new_row], ignore_index=True)
+    else:
+        out = new_row
+    out.sort_values(["task", "reward_type", "algorithm", "seed"]).to_csv(global_csv, index=False)
+
+
+def save_checkpoint(agent, model_path: str, algorithm: str, args, obs_dim: int, act_dim: int, act_limit: float) -> None:
+    checkpoint = {
+        "algorithm": algorithm,
+        "task": args.task,
+        "reward_type": args.reward_type,
+        "seed": args.seed,
+        "obs_dim": obs_dim,
+        "act_dim": act_dim,
+        "act_limit": act_limit,
+        "hidden_dim": args.hidden_dim,
+        "args": vars(args),
+        "actor_state_dict": agent.actor.state_dict(),
+    }
+    torch.save(checkpoint, model_path)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="FetchReach",
@@ -283,6 +367,7 @@ def main():
     parser.add_argument("--log-dir", type=str, default="logs")
     parser.add_argument("--plots-dir", type=str, default="plots")
     parser.add_argument("--plot-smooth", type=int, default=10)
+    parser.add_argument("--baseline-dir", type=str, default="baselines")
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -313,7 +398,10 @@ def main():
     )
     replay = ReplayBuffer(obs_dim, act_dim, args.replay_size)
 
-    csv_path = os.path.join(args.log_dir, f"td3_{args.task}_{args.reward_type}_seed{args.seed}.csv")
+    run_dirs = create_run_dirs(args.baseline_dir, "td3", args.task, args.reward_type, args.seed)
+    run_name = f"td3_{args.task}_{args.reward_type}_seed{args.seed}"
+    csv_path = os.path.join(run_dirs["logs"], f"{run_name}.csv")
+    model_path = os.path.join(run_dirs["models"], f"{run_name}_final.pt")
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
@@ -406,8 +494,15 @@ def main():
             )
 
     env.close()
+    save_checkpoint(agent, model_path, "td3", args, obs_dim, act_dim, act_limit)
+    summary = summarize_run(csv_path, "td3", args.task, args.reward_type, args.seed, args, model_path)
+    write_summary_files(summary, run_dirs["summaries"], run_dirs["results"])
+
     print(f"Saved log to: {csv_path}")
-    write_and_plot(csv_path, smooth=args.plot_smooth, plots_dir=args.plots_dir)
+    print(f"Saved model to: {model_path}")
+    print(f"Saved run summary to: {os.path.join(run_dirs['summaries'], 'summary.csv')}")
+    print(f"Updated global table: {os.path.join(run_dirs['results'], 'baseline_results.csv')}")
+    write_and_plot(csv_path, smooth=args.plot_smooth, plots_dir=run_dirs["plots"])
 
 
 if __name__ == "__main__":
