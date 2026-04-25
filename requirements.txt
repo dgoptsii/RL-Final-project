@@ -1,0 +1,8 @@
+gymnasium
+gymnasium-robotics
+numpy
+pandas
+torch
+matplotlib
+imageio
+optuna

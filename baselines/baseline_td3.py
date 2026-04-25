@@ -15,7 +15,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from plot_baselines_results import find_x_column, outdir_for_csv, plot_single_run
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from plot_all_results import find_x_column, outdir_for_csv, plot_single_run
 
 gym.register_envs(gymnasium_robotics)
 

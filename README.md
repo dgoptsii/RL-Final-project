@@ -1,59 +1,65 @@
-# RL Fetch Baselines
 
-## Overview
-This project implements baseline reinforcement learning algorithms for Fetch robotics tasks:
-- DDPG
-- TD3
-- SAC
 
-Each script trains an agent, logs results, and generates plots automatically.
+## Recommended run order
 
----
+Run these first on FetchReach sparse:
 
-## Files
+1. SAC baseline - FetchReach sparse
+2. SAC + HER - FetchReach sparse
+3. SAC + prioritized HER - FetchReach sparse
+4. SAC + HER + linear curriculum - FetchReach sparse
+5. SAC + HER + adaptive curriculum - FetchReach sparse
+6. SAC + HER + GoalGAN sampler - FetchReach sparse
 
-- baseline_ddpg.py → DDPG baseline
-- baseline_td3.py → TD3 baseline
-- baseline_sac.py → SAC baseline
-- plot_results.py → Plot training results
-- train_baselines_optuna.py → Hyperparameter tuning (Optuna)
-- requirements_fetch_project.txt → Dependencies
+DDPG and TD3 sparse are included too, but they are expected to be weaker.
 
----
+## Comparable hyperparameters
 
-## Setup
+The HER-family configs use the same shared settings:
 
-pip install -r requirements_fetch_project.txt
+- episodes: 800
+- hidden_dim: 256
+- replay_size: 1,000,000
+- batch_size: 256
+- actor_lr: 0.0001
+- critic_lr: 0.0003
+- gamma: 0.98
+- tau: 0.005
+- alpha: 0.2
+- start_steps: 1000
+- updates_per_step: 1
+- HER k: 4
+- HER future offset: 1
+- eval every: 10
+- eval episodes: 20
 
----
 
-## Run
+## Dependencies
 
-Example:
+Install with:
 
-python baseline_td3.py --task FetchReach --reward-type dense --episodes 300
+```bash
+pip install -r requirements.txt
+```
 
----
+Required packages:
 
-## Outputs
+- gymnasium
+- gymnasium-robotics
+- numpy
+- pandas
+- torch
+- matplotlib
+- imageio
+- optuna, only needed for `train_baselines_optuna.py`
 
-- Logs → logs/
-- Plots → plots/
+## Expected outputs
 
----
+Examples:
 
-## Plot manually
+- `results/her_regular/logs/sac_her/FetchReach_sparse/seed0/...csv`
+- `results/her_regular/plots/sac_her/FetchReach_sparse/seed0/.../*.png`
+- `results/her_regular/models/sac_her/FetchReach_sparse/seed0/...pt`
+- `results/her_regular/results/her_results.csv`
 
-python plot_results.py --csv logs/your_run.csv
-
----
-
-## Hyperparameter tuning
-
-python train_baselines_optuna.py --algorithm td3 --task FetchReach --n-trials 20
-
----
-
-## VS Code
-
-launch.json contains ready-to-use configs for running and debugging.
+After all HER-family runs finish, run the VS Code config `Plot HER family comparison`.

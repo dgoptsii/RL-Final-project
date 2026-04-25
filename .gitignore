@@ -1,0 +1,71 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+
+# =========================
+# Logs & outputs (RL runs)
+# =========================
+logs/
+results/
+summaries/
+
+# Tensorboard / wandb (if used)
+runs/
+wandb/
+
+# =========================
+# Models / checkpoints
+# =========================
+models/
+*.pt
+*.pth
+*.ckpt
+
+# =========================
+# Plots / animations
+# =========================
+plots/
+animations/
+*.gif
+*.mp4
+*.png
+
+# =========================
+# Data / datasets
+# =========================
+results/
+
+# =========================
+# Temporary / debug
+# =========================
+*.log
+*.tmp
+*.bak
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# macOS Python artifacts
+# =========================
+.python-version
