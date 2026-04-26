@@ -341,37 +341,48 @@ def create_run_dirs(base_dir: str, algorithm: str, task: str, reward_type: str, 
     return dirs
 
 
-def summarize_run(csv_path: str, algorithm: str, task: str, reward_type: str, seed: int, args, model_path: str, last_n: int = 5) -> dict:
+def summarize_run(csv_path: str, algorithm: str, task: str, reward_type: str, seed: int, args,
+                  model_path: str, last_n: int = 5) -> dict:
     df = pd.read_csv(csv_path)
-    eval_success = df["eval_success"].dropna() if "eval_success" in df.columns else pd.Series(dtype=float)
-    eval_return = df["eval_return"].dropna() if "eval_return" in df.columns else pd.Series(dtype=float)
-    eval_dist = df["eval_true_goal_distance"].dropna() if "eval_true_goal_distance" in df.columns else pd.Series(dtype=float)
-    her_added = df["her_transitions_added"].dropna() if "her_transitions_added" in df.columns else pd.Series(dtype=float)
+
+    eval_df = df.dropna(subset=["eval_success"]).copy()
+
+    if len(eval_df) > 0:
+        eval_success = eval_df["eval_success"]
+
+        reached_90 = eval_df[eval_df["eval_success"] >= 0.90]
+
+        episodes_to_90_success = (
+            int(reached_90["episode"].iloc[0])
+            if len(reached_90) > 0
+            else np.nan
+        )
+
+        final_eval_success = float(eval_success.iloc[-1])
+        best_eval_success = float(eval_success.max())
+        last5_eval_success_mean = float(eval_success.tail(last_n).mean())
+        last5_eval_success_std = float(eval_success.tail(last_n).std(ddof=0))
+
+    else:
+        final_eval_success = np.nan
+        best_eval_success = np.nan
+        last5_eval_success_mean = np.nan
+        last5_eval_success_std = np.nan
+        episodes_to_90_success = np.nan
+
     return {
         "algorithm": algorithm,
         "task": task,
         "reward_type": reward_type,
         "seed": seed,
         "episodes": args.episodes,
-        "use_her": bool(args.use_her),
-        "her_k": args.her_k,
-        "future_offset": args.her_future_offset,
-        "use_curriculum": bool(args.use_curriculum),
-        "curriculum_mode": args.curriculum_mode,
-        "curriculum_start_ratio": args.curriculum_start_ratio,
-        "curriculum_end_ratio": args.curriculum_end_ratio,
-        "curriculum_duration_episodes": args.curriculum_duration_episodes,
-        "eval_every": args.eval_every,
-        "eval_episodes": args.eval_episodes,
-        "final_eval_success": float(eval_success.iloc[-1]) if len(eval_success) else float("nan"),
-        "best_eval_success": float(eval_success.max()) if len(eval_success) else float("nan"),
-        "last5_eval_success_mean": float(eval_success.tail(last_n).mean()) if len(eval_success) else float("nan"),
-        "last5_eval_success_std": float(eval_success.tail(last_n).std(ddof=0)) if len(eval_success) else float("nan"),
-        "final_eval_return": float(eval_return.iloc[-1]) if len(eval_return) else float("nan"),
-        "best_eval_return": float(eval_return.max()) if len(eval_return) else float("nan"),
-        "last5_eval_return_mean": float(eval_return.tail(last_n).mean()) if len(eval_return) else float("nan"),
-        "last5_eval_distance_mean": float(eval_dist.tail(last_n).mean()) if len(eval_dist) else float("nan"),
-        "total_her_transitions_added": float(her_added.sum()) if len(her_added) else 0.0,
+
+        "final_eval_success": final_eval_success,
+        "best_eval_success": best_eval_success,
+        "last5_eval_success_mean": last5_eval_success_mean,
+        "last5_eval_success_std": last5_eval_success_std,
+        "episodes_to_90_success": episodes_to_90_success,
+
         "csv_path": csv_path,
         "model_path": model_path,
     }
@@ -453,6 +464,13 @@ def main():
     parser.add_argument("--carry-eval-forward", action="store_true")
     parser.add_argument("--plot-smooth", type=int, default=10)
     parser.add_argument("--her-dir", type=str, default="her")
+    parser.add_argument(
+    "--save-checkpoint-every",
+    type=int,
+    default=50,
+    help="Save checkpoint every N episodes. Use 0 to disable."
+    )
+
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -484,7 +502,7 @@ def main():
     curriculum_state = CurriculumState(ratio=float(args.curriculum_start_ratio))
     recent_curr_success = deque(maxlen=args.curriculum_window)
 
-    run_dirs = create_run_dirs(args.her_dir, algorithm, args.task, args.reward_type, args.seed)
+    run_dirs = create_run_dirs("results", algorithm, args.task, args.reward_type, args.seed)
     run_name = f"{algorithm}_{args.task}_{args.reward_type}_seed{args.seed}"
     csv_path = os.path.join(run_dirs["logs"], f"{run_name}.csv")
     model_path = os.path.join(run_dirs["models"], f"{run_name}_final.pt")
@@ -596,6 +614,24 @@ def main():
             ])
             f.flush()
 
+            if args.save_checkpoint_every > 0 and episode_idx % args.save_checkpoint_every == 0:
+                checkpoint_path = os.path.join(
+                    run_dirs["models"],
+                    f"{run_name}_episode{episode_idx}.pt"
+                )
+
+                save_checkpoint(
+                    agent,
+                    checkpoint_path,
+                    algorithm,
+                    args,
+                    obs_dim,
+                    act_dim,
+                    act_limit,
+                )
+
+                print(f"[CHECKPOINT] Saved: {checkpoint_path}")
+
             eval_success_str = f"{eval_success:.3f}" if not np.isnan(eval_success) else "NA"
             recent_success_str = f"{float(np.mean(recent_success)):.3f}" if recent_success else "NA"
             recent_true_success_str = f"{float(np.mean(recent_true_success)):.3f}" if recent_true_success else "NA"
@@ -611,7 +647,7 @@ def main():
 
     env.close()
     save_checkpoint(agent, model_path, algorithm, args, obs_dim, act_dim, act_limit)
-    summary = summarize_run(csv_path, algorithm, args.task, args.reward_type, args.seed, args, model_path)
+    summary = summarize_run(csv_path, "sac_her_curriculum", args.task, args.reward_type, args.seed, args, model_path)
     write_summary_files(summary, run_dirs["summaries"], run_dirs["results"])
 
     print(f"Saved log to: {csv_path}")

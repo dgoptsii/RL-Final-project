@@ -260,22 +260,53 @@ def create_run_dirs(base_dir: str, algorithm: str, task: str, reward_type: str, 
     return dirs
 
 
-def summarize_run(csv_path: str, algorithm: str, args, model_path: str, last_n: int = 5) -> dict:
+
+def summarize_run(csv_path: str, algorithm: str, task: str, reward_type: str, seed: int, args,
+                  model_path: str, last_n: int = 5) -> dict:
     df = pd.read_csv(csv_path)
-    eval_success = df["eval_success"].dropna() if "eval_success" in df.columns else pd.Series(dtype=float)
-    eval_return = df["eval_return"].dropna() if "eval_return" in df.columns else pd.Series(dtype=float)
-    eval_dist = df["eval_true_goal_distance"].dropna() if "eval_true_goal_distance" in df.columns else pd.Series(dtype=float)
+
+    eval_df = df.dropna(subset=["eval_success"]).copy()
+
+    if len(eval_df) > 0:
+        eval_success = eval_df["eval_success"]
+
+        reached_90 = eval_df[eval_df["eval_success"] >= 0.90]
+
+        episodes_to_90_success = (
+            int(reached_90["episode"].iloc[0])
+            if len(reached_90) > 0
+            else np.nan
+        )
+
+        final_eval_success = float(eval_success.iloc[-1])
+        best_eval_success = float(eval_success.max())
+        last5_eval_success_mean = float(eval_success.tail(last_n).mean())
+        last5_eval_success_std = float(eval_success.tail(last_n).std(ddof=0))
+
+    else:
+        final_eval_success = np.nan
+        best_eval_success = np.nan
+        last5_eval_success_mean = np.nan
+        last5_eval_success_std = np.nan
+        episodes_to_90_success = np.nan
+
     return {
-        "algorithm": algorithm, "task": args.task, "reward_type": args.reward_type, "seed": args.seed,
-        "episodes": args.episodes, "use_her": bool(args.use_her), "her_k": args.her_k,
-        "per_alpha": args.per_alpha, "per_beta_start": args.per_beta_start, "per_beta_end": args.per_beta_end,
-        "final_eval_success": float(eval_success.iloc[-1]) if len(eval_success) else float("nan"),
-        "best_eval_success": float(eval_success.max()) if len(eval_success) else float("nan"),
-        "last5_eval_success_mean": float(eval_success.tail(last_n).mean()) if len(eval_success) else float("nan"),
-        "final_eval_return": float(eval_return.iloc[-1]) if len(eval_return) else float("nan"),
-        "last5_eval_distance_mean": float(eval_dist.tail(last_n).mean()) if len(eval_dist) else float("nan"),
-        "csv_path": csv_path, "model_path": model_path,
+        "algorithm": algorithm,
+        "task": task,
+        "reward_type": reward_type,
+        "seed": seed,
+        "episodes": args.episodes,
+
+        "final_eval_success": final_eval_success,
+        "best_eval_success": best_eval_success,
+        "last5_eval_success_mean": last5_eval_success_mean,
+        "last5_eval_success_std": last5_eval_success_std,
+        "episodes_to_90_success": episodes_to_90_success,
+
+        "csv_path": csv_path,
+        "model_path": model_path,
     }
+
 
 
 def write_summary_files(summary: dict, run_summary_dir: str, global_results_dir: str) -> None:
@@ -298,6 +329,20 @@ def linear_beta(episode_idx: int, episodes: int, beta_start: float, beta_end: fl
     frac = min(1.0, max(0.0, episode_idx / max(1, episodes)))
     return beta_start + frac * (beta_end - beta_start)
 
+def save_checkpoint(agent, model_path, algorithm, args, obs_dim, act_dim, act_limit):
+    checkpoint = {
+        "algorithm": algorithm,
+        "task": args.task,
+        "reward_type": args.reward_type,
+        "seed": args.seed,
+        "obs_dim": obs_dim,
+        "act_dim": act_dim,
+        "act_limit": act_limit,
+        "hidden_dim": args.hidden_dim,
+        "args": vars(args),
+        "actor_state_dict": agent.actor.state_dict(),
+    }
+    torch.save(checkpoint, model_path)
 
 def main():
     parser = argparse.ArgumentParser(description="Manual SAC + prioritized HER for Fetch tasks.")
@@ -330,6 +375,12 @@ def main():
     parser.add_argument("--carry-eval-forward", action="store_true")
     parser.add_argument("--plot-smooth", type=int, default=10)
     parser.add_argument("--prioritized-her-dir", type=str, default="prioritized_her")
+    parser.add_argument(
+    "--save-checkpoint-every",
+    type=int,
+    default=50,
+    help="Save checkpoint every N episodes. Use 0 to disable."
+    )
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -346,7 +397,7 @@ def main():
                                 alpha=args.alpha, auto_alpha=args.auto_alpha, alpha_lr=args.alpha_lr)
     replay = PrioritizedReplayBuffer(obs_dim, act_dim, args.replay_size, alpha=args.per_alpha)
 
-    run_dirs = create_run_dirs(args.prioritized_her_dir, algorithm, args.task, args.reward_type, args.seed)
+    run_dirs = create_run_dirs("results", algorithm, args.task, args.reward_type, args.seed)
     run_name = f"{algorithm}_{args.task}_{args.reward_type}_seed{args.seed}"
     csv_path = os.path.join(run_dirs["logs"], f"{run_name}.csv")
     model_path = os.path.join(run_dirs["models"], f"{run_name}_final.pt")
@@ -412,6 +463,23 @@ def main():
                              float(np.mean(td_means)) if td_means else np.nan, float(np.max(td_maxes)) if td_maxes else np.nan,
                              float(np.mean(iw_means)) if iw_means else np.nan, priority_mean, priority_max, beta, her_added, replay.size])
             f.flush()
+            if args.save_checkpoint_every > 0 and episode_idx % args.save_checkpoint_every == 0:
+                checkpoint_path = os.path.join(
+                    run_dirs["models"],
+                    f"{run_name}_episode{episode_idx}.pt"
+                )
+
+                save_checkpoint(
+                    agent,
+                    checkpoint_path,
+                    algorithm,
+                    args,
+                    obs_dim,
+                    act_dim,
+                    act_limit,
+                )
+
+                print(f"[CHECKPOINT] Saved: {checkpoint_path}")
 
             print(f"Episode {episode_idx:04d} | algo={algorithm} | task={args.task} | reward={args.reward_type} | return={ep_return:.2f} | "
                   f"train_success={ep_success:.1f} (recent={float(np.mean(recent_success)):.3f}) | dist={ep_distance:.4f} | "
@@ -419,7 +487,8 @@ def main():
 
     env.close()
     torch.save({"algorithm": algorithm, "args": vars(args), "actor_state_dict": agent.actor.state_dict()}, model_path)
-    summary = summarize_run(csv_path, algorithm, args, model_path)
+    summary =  summarize_run(csv_path, "sac_prioritized_her", args.task, args.reward_type, args.seed, args, model_path)
+   
     write_summary_files(summary, run_dirs["summaries"], run_dirs["results"])
     print(f"Saved log to: {csv_path}")
     print(f"Saved model to: {model_path}")

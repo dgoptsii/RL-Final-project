@@ -649,7 +649,26 @@
       "10"
     ],
     "console": "integratedTerminal"
-  }
+  }, 
+
+  {
+  "name": "Animate Learning",
+  "type": "debugpy",
+  "request": "launch",
+
+    // change path to file here 
+  "program": "animations/animate_prioritized_her.py",
+  "args": [
+    // change path to file here 
+    "--checkpoint-dir", "results/models/sac/sac_FetchReach_sparse/seed0",
+    "--task", "FetchReach",
+    "--reward-type", "sparse",
+    "--max-checkpoints", "8",
+    "--fps", "20",
+//change name of file to save
+    "--out", "animations/sparse_sac_her.gif"
+  ]
+}
 
   ]
 }
