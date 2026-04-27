@@ -42,11 +42,11 @@ models/
 # =========================
 # Plots / animations
 # =========================
-plots/
-animations/
-*.gif
-*.mp4
-*.png
+# plots/
+# animations/
+# *.gif
+# *.mp4
+# *.png
 
 # =========================
 # Data / datasets
