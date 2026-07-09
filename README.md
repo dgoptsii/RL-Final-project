@@ -1,65 +1,49 @@
+# Learning Goal-Conditioned Robotic Manipulation under Sparse Rewards with HER
+
+This repository contains the final project for **COMP 579: Reinforcement Learning** at McGill University. Full report can be found in the root folder of the repository. 
+
+The project studies goal-conditioned robotic manipulation under sparse rewards using the `FetchReach` environment. We compare standard off-policy reinforcement learning methods and evaluate whether Hindsight Experience Replay (HER), prioritized HER, curriculum learning, and GoalGAN-style goal sampling improve learning efficiency.
+
+## Project Overview
+
+Sparse rewards make robotic reinforcement learning difficult because the agent receives useful feedback only when it successfully reaches the goal. In the `FetchReach` task, a robotic arm must move its end-effector to a target position in 3D space.
+
+We evaluate:
+
+- DDPG
+- TD3
+- SAC
+- SAC + HER
+- SAC + Prioritized HER
+- SAC + HER + Linear Curriculum
+- SAC + HER + Adaptive Curriculum
+- SAC + HER + GoalGAN-style goal sampling
 
 
-## Recommended run order
+## Key Results
 
-Run these first on FetchReach sparse:
+| Method | Reward Type | Final Success | Episodes to 90% Success |
+|---|---:|---:|---:|
+| DDPG | Dense | 1.00 | 180 |
+| TD3 | Dense | 1.00 | 220 |
+| SAC | Dense | 1.00 | 90 |
+| DDPG | Sparse | 0.00 | — |
+| TD3 | Sparse | 0.10 | — |
+| SAC | Sparse | 1.00 | 350 |
+| SAC + HER | Sparse | 1.00 | 190 |
+| SAC + Prioritized HER | Sparse | 1.00 | 150 |
+| SAC + HER + Linear Curriculum | Sparse | 1.00 | 180 |
+| SAC + HER + Adaptive Curriculum | Sparse | 1.00 | 200 |
+| SAC + HER + GoalGAN | Sparse | 1.00 | 210 |
 
-1. SAC baseline - FetchReach sparse
-2. SAC + HER - FetchReach sparse
-3. SAC + prioritized HER - FetchReach sparse
-4. SAC + HER + linear curriculum - FetchReach sparse
-5. SAC + HER + adaptive curriculum - FetchReach sparse
-6. SAC + HER + GoalGAN sampler - FetchReach sparse
+## Repository Structure
 
-DDPG and TD3 sparse are included too, but they are expected to be weaker.
-
-## Comparable hyperparameters
-
-The HER-family configs use the same shared settings:
-
-- episodes: 800
-- hidden_dim: 256
-- replay_size: 1,000,000
-- batch_size: 256
-- actor_lr: 0.0001
-- critic_lr: 0.0003
-- gamma: 0.98
-- tau: 0.005
-- alpha: 0.2
-- start_steps: 1000
-- updates_per_step: 1
-- HER k: 4
-- HER future offset: 1
-- eval every: 10
-- eval episodes: 20
-
-
-## Dependencies
-
-Install with:
-
-```bash
-pip install -r requirements.txt
-```
-
-Required packages:
-
-- gymnasium
-- gymnasium-robotics
-- numpy
-- pandas
-- torch
-- matplotlib
-- imageio
-- optuna, only needed for `train_baselines_optuna.py`
-
-## Expected outputs
-
-Examples:
-
-- `results/her_regular/logs/sac_her/FetchReach_sparse/seed0/...csv`
-- `results/her_regular/plots/sac_her/FetchReach_sparse/seed0/.../*.png`
-- `results/her_regular/models/sac_her/FetchReach_sparse/seed0/...pt`
-- `results/her_regular/results/her_results.csv`
-
-After all HER-family runs finish, run the VS Code config `Plot HER family comparison`.
+```text
+RL-Final-project/
+├── baselines/              # DDPG, TD3, and SAC baseline implementations
+├── her/                    # HER and prioritized HER implementations
+├── curriculum/             # Curriculum learning and GoalGAN-style methods
+├── animations/             # Saved environment rollouts / visualizations
+├── plot_all_results.py     # Script for plotting result comparisons
+├── requirements.txt        # Python dependencies
+└── README.md
